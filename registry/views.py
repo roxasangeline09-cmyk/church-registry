@@ -130,6 +130,7 @@ def sacrament_list(request):
         'baptisms': baptisms, 'confirmations': confirmations,
         'communions': communions, 'marriages': marriages,
         'last_rites': last_rites, 'q': q,
+        'all_members': Member.objects.filter(is_active=True).order_by('last_name', 'first_name'),
     }
     return render(request, 'registry/sacraments/list.html', context)
 
@@ -148,7 +149,7 @@ def baptism_create(request, member_pk):
         b.save()
         messages.success(request, 'Baptism record saved.')
         return redirect('member_detail', pk=member_pk)
-    return render(request, 'registry/sacraments/form.html', {'form': form, 'member': member, 'title': 'Add Baptism Record'})
+    return render(request, 'registry/sacraments/form_baptism.html', {'form': form, 'member': member, 'title': 'Add Baptism Record'})
 
 
 @login_required
@@ -159,7 +160,7 @@ def baptism_edit(request, pk):
         form.save()
         messages.success(request, 'Baptism record updated.')
         return redirect('member_detail', pk=baptism.member.pk)
-    return render(request, 'registry/sacraments/form.html', {'form': form, 'member': baptism.member, 'title': 'Edit Baptism Record'})
+    return render(request, 'registry/sacraments/form_baptism.html', {'form': form, 'member': baptism.member, 'title': 'Edit Baptism Record'})
 
 
 @login_required
@@ -376,3 +377,29 @@ def payment_delete(request, pk):
         messages.success(request, 'Payment removed.')
         return redirect('pledge_detail', pk=pledge_pk)
     return render(request, 'registry/confirm_delete.html', {'object': payment, 'type': 'Payment'})
+
+
+# ─── PRINT VIEWS ─────────────────────────────────────────────────────────────
+
+@login_required
+def member_print(request, pk):
+    member = get_object_or_404(Member, pk=pk)
+    return render(request, 'registry/members/print_member.html', {'member': member})
+
+
+@login_required
+def member_list_print(request):
+    members = Member.objects.filter(is_active=True).order_by('last_name', 'first_name')
+    return render(request, 'registry/members/print_member_list.html', {'members': members})
+
+
+@login_required
+def pledge_print(request, pk):
+    pledge = get_object_or_404(Pledge, pk=pk)
+    return render(request, 'registry/pledges/print_pledge.html', {'pledge': pledge})
+
+
+@login_required
+def pledge_list_print(request):
+    pledges = Pledge.objects.select_related('member').order_by('member__last_name')
+    return render(request, 'registry/pledges/print_pledge_list.html', {'pledges': pledges})

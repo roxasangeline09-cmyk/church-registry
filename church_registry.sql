@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS registry_baptism (
     member_id             BIGINT UNSIGNED NOT NULL UNIQUE,
     date_baptized         DATE NOT NULL,
     priest                VARCHAR(150) NOT NULL,
-    godfather             VARCHAR(150) DEFAULT '',
-    godmother             VARCHAR(150) DEFAULT '',
+    godfathers            TEXT DEFAULT '' COMMENT 'Comma-separated list of godfathers',
+    godmothers            TEXT DEFAULT '' COMMENT 'Comma-separated list of godmothers',
     birth_certificate_no  VARCHAR(100) DEFAULT '',
     remarks               TEXT DEFAULT '',
     CONSTRAINT fk_baptism_member FOREIGN KEY (member_id)

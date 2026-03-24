@@ -38,10 +38,16 @@ class Baptism(models.Model):
     member = models.OneToOneField(Member, on_delete=models.CASCADE, related_name='baptism')
     date_baptized = models.DateField()
     priest = models.CharField(max_length=150)
-    godfather = models.CharField(max_length=150, blank=True)
-    godmother = models.CharField(max_length=150, blank=True)
+    godfathers = models.TextField(blank=True, default='', help_text='Comma-separated list of godfathers')
+    godmothers = models.TextField(blank=True, default='', help_text='Comma-separated list of godmothers')
     birth_certificate_no = models.CharField(max_length=100, blank=True)
     remarks = models.TextField(blank=True)
+
+    def get_godfathers(self):
+        return [g.strip() for g in self.godfathers.split(',') if g.strip()]
+
+    def get_godmothers(self):
+        return [g.strip() for g in self.godmothers.split(',') if g.strip()]
 
     def __str__(self):
         return f"Baptism - {self.member}"
@@ -76,7 +82,11 @@ class Marriage(models.Model):
     priest = models.CharField(max_length=150)
     principal_sponsor = models.CharField(max_length=150, blank=True)
     secondary_sponsor = models.CharField(max_length=150, blank=True)
+    witnesses = models.TextField(blank=True, default='', help_text='Comma-separated list of witnesses')
     remarks = models.TextField(blank=True)
+
+    def get_witnesses(self):
+        return [w.strip() for w in self.witnesses.split(',') if w.strip()]
 
     def __str__(self):
         return f"Marriage - {self.member} & {self.spouse_name}"

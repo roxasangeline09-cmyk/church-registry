@@ -1,5 +1,4 @@
 {% extends 'registry/base.html' %}
-{% block title %}{{ member.full_name }} — Church Registry{% endblock %}
 {% block page_title %}Member Profile{% endblock %}
 
 {% block content %}
@@ -16,6 +15,9 @@
                 <div class="d-flex gap-2 justify-content-center">
                     <a href="{% url 'member_edit' member.pk %}" class="btn btn-sm btn-primary-church">
                         <i class="bi bi-pencil me-1"></i>Edit
+                    </a>
+                    <a href="{% url 'member_print' member.pk %}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                        <i class="bi bi-printer me-1"></i>Print
                     </a>
                     <a href="{% url 'member_deactivate' member.pk %}" class="btn btn-sm btn-outline-danger">
                         <i class="bi bi-person-x me-1"></i>Deactivate
@@ -55,6 +57,12 @@
                                     {% if member.baptism %}
                                         <div class="small text-muted mt-1">{{ member.baptism.date_baptized }}</div>
                                         <div class="small">Fr. {{ member.baptism.priest }}</div>
+                                        {% if member.baptism.get_godfathers %}
+                                        <div class="small text-muted">GF: {{ member.baptism.get_godfathers|join:", " }}</div>
+                                        {% endif %}
+                                        {% if member.baptism.get_godmothers %}
+                                        <div class="small text-muted">GM: {{ member.baptism.get_godmothers|join:", " }}</div>
+                                        {% endif %}
                                     {% else %}
                                         <div class="small text-muted mt-1">No record</div>
                                     {% endif %}

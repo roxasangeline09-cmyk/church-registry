@@ -1,5 +1,4 @@
 {% extends 'registry/base.html' %}
-{% block title %}Pledges — Church Registry{% endblock %}
 {% block page_title %}Pledges{% endblock %}
 
 {% block content %}
@@ -16,6 +15,9 @@
                     {% if q %}<a href="{% url 'pledge_list' %}" class="btn btn-outline-danger"><i class="bi bi-x"></i></a>{% endif %}
                 </div>
             </form>
+            <a href="{% url 'pledge_list_print' %}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                <i class="bi bi-printer me-1"></i>Print List
+            </a>
             <a href="{% url 'pledge_create' %}" class="btn btn-sm btn-primary-church">
                 <i class="bi bi-plus-lg me-1"></i>Add Pledge
             </a>

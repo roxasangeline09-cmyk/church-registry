@@ -52,4 +52,10 @@ urlpatterns = [
     path('pledges/<int:pk>/delete/', views.pledge_delete, name='pledge_delete'),
     path('pledges/<int:pledge_pk>/payment/add/', views.payment_add, name='payment_add'),
     path('payment/<int:pk>/delete/', views.payment_delete, name='payment_delete'),
+
+    # Print
+    path('members/<int:pk>/print/', views.member_print, name='member_print'),
+    path('members/print/all/', views.member_list_print, name='member_list_print'),
+    path('pledges/<int:pk>/print/', views.pledge_print, name='pledge_print'),
+    path('pledges/print/all/', views.pledge_list_print, name='pledge_list_print'),
 ]

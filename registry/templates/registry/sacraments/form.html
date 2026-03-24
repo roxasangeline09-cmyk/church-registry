@@ -1,5 +1,4 @@
 {% extends 'registry/base.html' %}
-{% block title %}{{ title }} — Church Registry{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
 
 {% block content %}
@@ -13,14 +12,32 @@
             <div class="card-body px-4 pb-4">
                 <hr class="mt-0">
                 <h6 class="fw-semibold mb-3" style="color:#6b3a2a;">{{ title }}</h6>
+
+                {% if form.errors %}
+                <div class="alert alert-danger py-2 px-3 mb-3" style="border-radius:8px;">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Please fix the errors below before saving.</strong>
+                </div>
+                {% endif %}
+
                 <form method="post" novalidate>
                     {% csrf_token %}
                     <div class="row g-3">
                         {% for field in form %}
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold small">{{ field.label }}</label>
+                            <label class="form-label fw-semibold small">
+                                {{ field.label }}
+                                {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                            </label>
                             {{ field }}
-                            {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors.0 }}</div>{% endif %}
+                            {% if field.errors %}
+                                <div class="text-danger small mt-1">
+                                    <i class="bi bi-x-circle me-1"></i>{{ field.errors.0 }}
+                                </div>
+                            {% endif %}
+                            {% if field.help_text %}
+                                <div class="text-muted small mt-1">{{ field.help_text }}</div>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -35,4 +52,24 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // All date fields in sacraments cannot be future
+        const today = new Date().toISOString().split('T')[0];
+        document.querySelectorAll('input[type="date"]').forEach(function (input) {
+            input.setAttribute('max', today);
+        });
+
+        // Highlight invalid fields
+        document.querySelectorAll('.text-danger').forEach(function (el) {
+            const input = el.previousElementSibling;
+            if (input && (input.tagName === 'INPUT' || input.tagName === 'SELECT' || input.tagName === 'TEXTAREA')) {
+                input.classList.add('is-invalid');
+            }
+        });
+    });
+</script>
 {% endblock %}

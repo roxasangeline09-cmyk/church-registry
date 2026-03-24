@@ -37,8 +37,8 @@
     <div class="field-row"><div class="field-label">Date of Birth:</div><div class="field-value">{{ baptism.member.birthday }}</div></div>
     <div class="field-row"><div class="field-label">Date Baptized:</div><div class="field-value">{{ baptism.date_baptized }}</div></div>
     <div class="field-row"><div class="field-label">Officiating Priest:</div><div class="field-value">{{ baptism.priest }}</div></div>
-    <div class="field-row"><div class="field-label">Godfather:</div><div class="field-value">{{ baptism.godfather|default:"—" }}</div></div>
-    <div class="field-row"><div class="field-label">Godmother:</div><div class="field-value">{{ baptism.godmother|default:"—" }}</div></div>
+    <div class="field-row"><div class="field-label">Godfathers:</div><div class="field-value">{{ baptism.get_godfathers|join:", "|default:"—" }}</div></div>
+    <div class="field-row"><div class="field-label">Godmothers:</div><div class="field-value">{{ baptism.get_godmothers|join:", "|default:"—" }}</div></div>
     {% if baptism.birth_certificate_no %}
     <div class="field-row"><div class="field-label">Birth Cert. No.:</div><div class="field-value">{{ baptism.birth_certificate_no }}</div></div>
     {% endif %}
