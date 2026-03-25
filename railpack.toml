@@ -1,0 +1,8 @@
+[build]
+nixpacks = ["python312", "pip"]
+
+[build.variables]
+PIP_CACHE_DIR = "/root/.cache/pip"
+
+[start]
+cmd = "gunicorn church_registry.wsgi:application --bind 0.0.0.0:8080"
