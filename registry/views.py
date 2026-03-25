@@ -2,22 +2,23 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
-from django.db.models import Q, Sum, Count
-from django.http import HttpResponse
-from .models import Member, Baptism, Confirmation, FirstHolyCommunion, Marriage, LastRites, Pledge, PledgePayment
-from .forms import (MemberForm, BaptismForm, ConfirmationForm, CommunionForm,
-                    MarriageForm, LastRitesForm, PledgeForm, PledgePaymentForm)
+from django.db.models import Q
+from .models import (Member, Sacrament, SacramentParticipant,
+                     BaptismDetail, ConfirmationDetail, CommunionDetail,
+                     MarriageDetail, LastRitesDetail, Pledge, PledgePayment)
+from .forms import (MemberForm, SacramentForm, BaptismDetailForm,
+                    ConfirmationDetailForm, CommunionDetailForm,
+                    MarriageDetailForm, LastRitesDetailForm,
+                    PledgeForm, PledgePaymentForm)
 
 
-# ─── AUTH ────────────────────────────────────────────────────────────────────
+# ─── AUTH ─────────────────────────────────────────────────────────────────────
 
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
     if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
+        user = authenticate(request, username=request.POST.get('username'), password=request.POST.get('password'))
         if user:
             login(request, user)
             return redirect('dashboard')
@@ -30,35 +31,24 @@ def logout_view(request):
     return redirect('login')
 
 
-# ─── DASHBOARD ───────────────────────────────────────────────────────────────
+# ─── DASHBOARD ────────────────────────────────────────────────────────────────
 
 @login_required
 def dashboard(request):
-    total_members = Member.objects.filter(is_active=True).count()
-    total_baptisms = Baptism.objects.count()
-    total_confirmations = Confirmation.objects.count()
-    total_communions = FirstHolyCommunion.objects.count()
-    total_marriages = Marriage.objects.count()
-    total_last_rites = LastRites.objects.count()
-    total_pledges = Pledge.objects.count()
-    outstanding_pledges = Pledge.objects.filter(status__in=['unpaid', 'partial']).count()
-    recent_members = Member.objects.filter(is_active=True).order_by('-date_registered')[:5]
-
-    context = {
-        'total_members': total_members,
-        'total_baptisms': total_baptisms,
-        'total_confirmations': total_confirmations,
-        'total_communions': total_communions,
-        'total_marriages': total_marriages,
-        'total_last_rites': total_last_rites,
-        'total_pledges': total_pledges,
-        'outstanding_pledges': outstanding_pledges,
-        'recent_members': recent_members,
-    }
-    return render(request, 'registry/dashboard.html', context)
+    return render(request, 'registry/dashboard.html', {
+        'total_members':       Member.objects.filter(is_active=True).count(),
+        'total_baptisms':      Sacrament.objects.filter(sacrament_type='baptism').count(),
+        'total_confirmations': Sacrament.objects.filter(sacrament_type='confirmation').count(),
+        'total_communions':    Sacrament.objects.filter(sacrament_type='communion').count(),
+        'total_marriages':     Sacrament.objects.filter(sacrament_type='marriage').count(),
+        'total_last_rites':    Sacrament.objects.filter(sacrament_type='last_rites').count(),
+        'total_pledges':       Pledge.objects.count(),
+        'outstanding_pledges': Pledge.objects.filter(status__in=['unpaid', 'partial']).count(),
+        'recent_members':      Member.objects.filter(is_active=True).order_by('-created_at')[:5],
+    })
 
 
-# ─── MEMBERS ─────────────────────────────────────────────────────────────────
+# ─── MEMBERS ──────────────────────────────────────────────────────────────────
 
 @login_required
 def member_list(request):
@@ -85,7 +75,15 @@ def member_create(request):
 @login_required
 def member_detail(request, pk):
     member = get_object_or_404(Member, pk=pk)
-    return render(request, 'registry/members/detail.html', {'member': member})
+    sacraments = member.sacraments.all()
+    return render(request, 'registry/members/detail.html', {
+        'member':       member,
+        'baptism':      sacraments.filter(sacrament_type='baptism').first(),
+        'confirmation': sacraments.filter(sacrament_type='confirmation').first(),
+        'communion':    sacraments.filter(sacrament_type='communion').first(),
+        'marriages':    sacraments.filter(sacrament_type='marriage'),
+        'last_rites':   sacraments.filter(sacrament_type='last_rites').first(),
+    })
 
 
 @login_required
@@ -110,209 +108,166 @@ def member_deactivate(request, pk):
     return render(request, 'registry/confirm_delete.html', {'object': member, 'type': 'Member'})
 
 
-# ─── SACRAMENTS ──────────────────────────────────────────────────────────────
+# ─── SACRAMENT HELPERS ────────────────────────────────────────────────────────
+
+def _get_detail(sacrament):
+    detail_map = {
+        'baptism':      'baptism_detail',
+        'confirmation': 'confirmation_detail',
+        'communion':    'communion_detail',
+        'marriage':     'marriage_detail',
+        'last_rites':   'last_rites_detail',
+    }
+    attr = detail_map.get(sacrament.sacrament_type)
+    return getattr(sacrament, attr, None) if attr else None
+
+
+def _save_participants(request, sacrament):
+    names = request.POST.getlist('participant_name[]')
+    roles = request.POST.getlist('participant_role[]')
+    sacrament.participants.all().delete()
+    for name, role in zip(names, roles):
+        name = name.strip()
+        if name:
+            SacramentParticipant.objects.create(sacrament=sacrament, name=name, role=role)
+
+
+def _sacrament_create(request, member_pk, sacrament_type, detail_form_class, template, title, allow_multiple=False):
+    member = get_object_or_404(Member, pk=member_pk)
+    if not allow_multiple and member.sacraments.filter(sacrament_type=sacrament_type).exists():
+        messages.warning(request, f'This member already has a {sacrament_type} record.')
+        return redirect('member_detail', pk=member_pk)
+
+    sac_form = SacramentForm(request.POST or None)
+    det_form = detail_form_class(request.POST or None) if detail_form_class else None
+
+    if request.method == 'POST' and sac_form.is_valid() and (det_form is None or det_form.is_valid()):
+        sacrament = sac_form.save(commit=False)
+        sacrament.member = member
+        sacrament.sacrament_type = sacrament_type
+        sacrament.save()
+        if det_form:
+            detail = det_form.save(commit=False)
+            detail.sacrament = sacrament
+            detail.save()
+        _save_participants(request, sacrament)
+        messages.success(request, f'{title} record saved.')
+        return redirect('member_detail', pk=member_pk)
+
+    return render(request, template, {'sac_form': sac_form, 'det_form': det_form, 'member': member, 'title': title})
+
+
+def _sacrament_edit(request, pk, detail_form_class, template, title):
+    sacrament = get_object_or_404(Sacrament, pk=pk)
+    detail_instance = _get_detail(sacrament)
+    sac_form = SacramentForm(request.POST or None, instance=sacrament)
+    det_form = detail_form_class(request.POST or None, instance=detail_instance) if detail_form_class else None
+
+    if request.method == 'POST' and sac_form.is_valid() and (det_form is None or det_form.is_valid()):
+        sac_form.save()
+        if det_form:
+            detail = det_form.save(commit=False)
+            detail.sacrament = sacrament
+            detail.save()
+        _save_participants(request, sacrament)
+        messages.success(request, f'{title} record updated.')
+        return redirect('member_detail', pk=sacrament.member.pk)
+
+    return render(request, template, {'sac_form': sac_form, 'det_form': det_form, 'member': sacrament.member, 'title': title, 'sacrament': sacrament})
+
+
+# ─── SACRAMENTS ───────────────────────────────────────────────────────────────
 
 @login_required
 def sacrament_list(request):
     q = request.GET.get('q', '')
-    baptisms = Baptism.objects.select_related('member')
-    confirmations = Confirmation.objects.select_related('member')
-    communions = FirstHolyCommunion.objects.select_related('member')
-    marriages = Marriage.objects.select_related('member')
-    last_rites = LastRites.objects.select_related('member')
+    qs = Sacrament.objects.select_related('member')
     if q:
-        baptisms = baptisms.filter(Q(member__first_name__icontains=q) | Q(member__last_name__icontains=q))
-        confirmations = confirmations.filter(Q(member__first_name__icontains=q) | Q(member__last_name__icontains=q))
-        communions = communions.filter(Q(member__first_name__icontains=q) | Q(member__last_name__icontains=q))
-        marriages = marriages.filter(Q(member__first_name__icontains=q) | Q(member__last_name__icontains=q) | Q(spouse_name__icontains=q))
-        last_rites = last_rites.filter(Q(member__first_name__icontains=q) | Q(member__last_name__icontains=q))
-    context = {
-        'baptisms': baptisms, 'confirmations': confirmations,
-        'communions': communions, 'marriages': marriages,
-        'last_rites': last_rites, 'q': q,
+        qs = qs.filter(Q(member__first_name__icontains=q) | Q(member__last_name__icontains=q))
+    return render(request, 'registry/sacraments/list.html', {
+        'baptisms':      qs.filter(sacrament_type='baptism'),
+        'confirmations': qs.filter(sacrament_type='confirmation'),
+        'communions':    qs.filter(sacrament_type='communion'),
+        'marriages':     qs.filter(sacrament_type='marriage'),
+        'last_rites':    qs.filter(sacrament_type='last_rites'),
+        'q': q,
         'all_members': Member.objects.filter(is_active=True).order_by('last_name', 'first_name'),
-    }
-    return render(request, 'registry/sacraments/list.html', context)
+    })
 
 
-# Baptism
 @login_required
 def baptism_create(request, member_pk):
-    member = get_object_or_404(Member, pk=member_pk)
-    if hasattr(member, 'baptism'):
-        messages.warning(request, 'This member already has a baptism record.')
-        return redirect('member_detail', pk=member_pk)
-    form = BaptismForm(request.POST or None)
-    if form.is_valid():
-        b = form.save(commit=False)
-        b.member = member
-        b.save()
-        messages.success(request, 'Baptism record saved.')
-        return redirect('member_detail', pk=member_pk)
-    return render(request, 'registry/sacraments/form_baptism.html', {'form': form, 'member': member, 'title': 'Add Baptism Record'})
-
+    return _sacrament_create(request, member_pk, 'baptism', BaptismDetailForm, 'registry/sacraments/form_baptism.html', 'Baptism')
 
 @login_required
 def baptism_edit(request, pk):
-    baptism = get_object_or_404(Baptism, pk=pk)
-    form = BaptismForm(request.POST or None, instance=baptism)
-    if form.is_valid():
-        form.save()
-        messages.success(request, 'Baptism record updated.')
-        return redirect('member_detail', pk=baptism.member.pk)
-    return render(request, 'registry/sacraments/form_baptism.html', {'form': form, 'member': baptism.member, 'title': 'Edit Baptism Record'})
-
+    return _sacrament_edit(request, pk, BaptismDetailForm, 'registry/sacraments/form_baptism.html', 'Baptism')
 
 @login_required
 def baptism_print(request, pk):
-    baptism = get_object_or_404(Baptism, pk=pk)
-    return render(request, 'registry/sacraments/print_baptism.html', {'baptism': baptism})
+    return render(request, 'registry/sacraments/print_baptism.html', {'baptism': get_object_or_404(Sacrament, pk=pk, sacrament_type='baptism')})
 
 
-# Confirmation
 @login_required
 def confirmation_create(request, member_pk):
-    member = get_object_or_404(Member, pk=member_pk)
-    if hasattr(member, 'confirmation'):
-        messages.warning(request, 'This member already has a confirmation record.')
-        return redirect('member_detail', pk=member_pk)
-    form = ConfirmationForm(request.POST or None)
-    if form.is_valid():
-        c = form.save(commit=False)
-        c.member = member
-        c.save()
-        messages.success(request, 'Confirmation record saved.')
-        return redirect('member_detail', pk=member_pk)
-    return render(request, 'registry/sacraments/form.html', {'form': form, 'member': member, 'title': 'Add Confirmation Record'})
-
+    return _sacrament_create(request, member_pk, 'confirmation', ConfirmationDetailForm, 'registry/sacraments/form.html', 'Confirmation')
 
 @login_required
 def confirmation_edit(request, pk):
-    conf = get_object_or_404(Confirmation, pk=pk)
-    form = ConfirmationForm(request.POST or None, instance=conf)
-    if form.is_valid():
-        form.save()
-        messages.success(request, 'Confirmation record updated.')
-        return redirect('member_detail', pk=conf.member.pk)
-    return render(request, 'registry/sacraments/form.html', {'form': form, 'member': conf.member, 'title': 'Edit Confirmation Record'})
-
+    return _sacrament_edit(request, pk, ConfirmationDetailForm, 'registry/sacraments/form.html', 'Confirmation')
 
 @login_required
 def confirmation_print(request, pk):
-    conf = get_object_or_404(Confirmation, pk=pk)
-    return render(request, 'registry/sacraments/print_confirmation.html', {'conf': conf})
+    return render(request, 'registry/sacraments/print_confirmation.html', {'conf': get_object_or_404(Sacrament, pk=pk, sacrament_type='confirmation')})
 
 
-# First Holy Communion
 @login_required
 def communion_create(request, member_pk):
-    member = get_object_or_404(Member, pk=member_pk)
-    if hasattr(member, 'communion'):
-        messages.warning(request, 'This member already has a communion record.')
-        return redirect('member_detail', pk=member_pk)
-    form = CommunionForm(request.POST or None)
-    if form.is_valid():
-        c = form.save(commit=False)
-        c.member = member
-        c.save()
-        messages.success(request, 'First Holy Communion record saved.')
-        return redirect('member_detail', pk=member_pk)
-    return render(request, 'registry/sacraments/form.html', {'form': form, 'member': member, 'title': 'Add First Holy Communion Record'})
-
+    return _sacrament_create(request, member_pk, 'communion', CommunionDetailForm, 'registry/sacraments/form.html', 'First Holy Communion')
 
 @login_required
 def communion_edit(request, pk):
-    communion = get_object_or_404(FirstHolyCommunion, pk=pk)
-    form = CommunionForm(request.POST or None, instance=communion)
-    if form.is_valid():
-        form.save()
-        messages.success(request, 'Communion record updated.')
-        return redirect('member_detail', pk=communion.member.pk)
-    return render(request, 'registry/sacraments/form.html', {'form': form, 'member': communion.member, 'title': 'Edit Communion Record'})
-
+    return _sacrament_edit(request, pk, CommunionDetailForm, 'registry/sacraments/form.html', 'First Holy Communion')
 
 @login_required
 def communion_print(request, pk):
-    communion = get_object_or_404(FirstHolyCommunion, pk=pk)
-    return render(request, 'registry/sacraments/print_communion.html', {'communion': communion})
+    return render(request, 'registry/sacraments/print_communion.html', {'communion': get_object_or_404(Sacrament, pk=pk, sacrament_type='communion')})
 
 
-# Marriage
 @login_required
 def marriage_create(request, member_pk):
-    member = get_object_or_404(Member, pk=member_pk)
-    form = MarriageForm(request.POST or None)
-    if form.is_valid():
-        m = form.save(commit=False)
-        m.member = member
-        m.save()
-        messages.success(request, 'Marriage record saved.')
-        return redirect('member_detail', pk=member_pk)
-    return render(request, 'registry/sacraments/form.html', {'form': form, 'member': member, 'title': 'Add Marriage Record'})
-
+    return _sacrament_create(request, member_pk, 'marriage', MarriageDetailForm, 'registry/sacraments/form_marriage.html', 'Marriage', allow_multiple=True)
 
 @login_required
 def marriage_edit(request, pk):
-    marriage = get_object_or_404(Marriage, pk=pk)
-    form = MarriageForm(request.POST or None, instance=marriage)
-    if form.is_valid():
-        form.save()
-        messages.success(request, 'Marriage record updated.')
-        return redirect('member_detail', pk=marriage.member.pk)
-    return render(request, 'registry/sacraments/form.html', {'form': form, 'member': marriage.member, 'title': 'Edit Marriage Record'})
-
+    return _sacrament_edit(request, pk, MarriageDetailForm, 'registry/sacraments/form_marriage.html', 'Marriage')
 
 @login_required
 def marriage_print(request, pk):
-    marriage = get_object_or_404(Marriage, pk=pk)
-    return render(request, 'registry/sacraments/print_marriage.html', {'marriage': marriage})
+    return render(request, 'registry/sacraments/print_marriage.html', {'marriage': get_object_or_404(Sacrament, pk=pk, sacrament_type='marriage')})
 
 
-# Last Rites
 @login_required
 def last_rites_create(request, member_pk):
-    member = get_object_or_404(Member, pk=member_pk)
-    if hasattr(member, 'last_rites'):
-        messages.warning(request, 'This member already has a last rites record.')
-        return redirect('member_detail', pk=member_pk)
-    form = LastRitesForm(request.POST or None)
-    if form.is_valid():
-        lr = form.save(commit=False)
-        lr.member = member
-        lr.save()
-        messages.success(request, 'Last Rites record saved.')
-        return redirect('member_detail', pk=member_pk)
-    return render(request, 'registry/sacraments/form.html', {'form': form, 'member': member, 'title': 'Add Last Rites Record'})
-
+    return _sacrament_create(request, member_pk, 'last_rites', LastRitesDetailForm, 'registry/sacraments/form.html', 'Last Rites')
 
 @login_required
 def last_rites_edit(request, pk):
-    lr = get_object_or_404(LastRites, pk=pk)
-    form = LastRitesForm(request.POST or None, instance=lr)
-    if form.is_valid():
-        form.save()
-        messages.success(request, 'Last Rites record updated.')
-        return redirect('member_detail', pk=lr.member.pk)
-    return render(request, 'registry/sacraments/form.html', {'form': form, 'member': lr.member, 'title': 'Edit Last Rites Record'})
-
+    return _sacrament_edit(request, pk, LastRitesDetailForm, 'registry/sacraments/form.html', 'Last Rites')
 
 @login_required
 def last_rites_print(request, pk):
-    lr = get_object_or_404(LastRites, pk=pk)
-    return render(request, 'registry/sacraments/print_last_rites.html', {'lr': lr})
+    return render(request, 'registry/sacraments/print_last_rites.html', {'lr': get_object_or_404(Sacrament, pk=pk, sacrament_type='last_rites')})
 
 
-# ─── PLEDGES ─────────────────────────────────────────────────────────────────
+# ─── PLEDGES ──────────────────────────────────────────────────────────────────
 
 @login_required
 def pledge_list(request):
     q = request.GET.get('q', '')
     pledges = Pledge.objects.select_related('member')
     if q:
-        pledges = pledges.filter(
-            Q(member__first_name__icontains=q) | Q(member__last_name__icontains=q) |
-            Q(description__icontains=q)
-        )
+        pledges = pledges.filter(Q(member__first_name__icontains=q) | Q(member__last_name__icontains=q))
     return render(request, 'registry/pledges/list.html', {'pledges': pledges, 'q': q})
 
 
@@ -329,8 +284,7 @@ def pledge_create(request):
 @login_required
 def pledge_detail(request, pk):
     pledge = get_object_or_404(Pledge, pk=pk)
-    payment_form = PledgePaymentForm()
-    return render(request, 'registry/pledges/detail.html', {'pledge': pledge, 'payment_form': payment_form})
+    return render(request, 'registry/pledges/detail.html', {'pledge': pledge, 'payment_form': PledgePaymentForm()})
 
 
 @login_required
@@ -379,27 +333,20 @@ def payment_delete(request, pk):
     return render(request, 'registry/confirm_delete.html', {'object': payment, 'type': 'Payment'})
 
 
-# ─── PRINT VIEWS ─────────────────────────────────────────────────────────────
+# ─── PRINT ────────────────────────────────────────────────────────────────────
 
 @login_required
 def member_print(request, pk):
-    member = get_object_or_404(Member, pk=pk)
-    return render(request, 'registry/members/print_member.html', {'member': member})
-
+    return render(request, 'registry/members/print_member.html', {'member': get_object_or_404(Member, pk=pk)})
 
 @login_required
 def member_list_print(request):
-    members = Member.objects.filter(is_active=True).order_by('last_name', 'first_name')
-    return render(request, 'registry/members/print_member_list.html', {'members': members})
-
+    return render(request, 'registry/members/print_member_list.html', {'members': Member.objects.filter(is_active=True).order_by('last_name', 'first_name')})
 
 @login_required
 def pledge_print(request, pk):
-    pledge = get_object_or_404(Pledge, pk=pk)
-    return render(request, 'registry/pledges/print_pledge.html', {'pledge': pledge})
-
+    return render(request, 'registry/pledges/print_pledge.html', {'pledge': get_object_or_404(Pledge, pk=pk)})
 
 @login_required
 def pledge_list_print(request):
-    pledges = Pledge.objects.select_related('member').order_by('member__last_name')
-    return render(request, 'registry/pledges/print_pledge_list.html', {'pledges': pledges})
+    return render(request, 'registry/pledges/print_pledge_list.html', {'pledges': Pledge.objects.select_related('member').order_by('member__last_name')})

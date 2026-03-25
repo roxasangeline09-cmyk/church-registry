@@ -8,7 +8,7 @@
         body { font-family: 'Georgia', serif; background: #fff; font-size: 13px; }
         .doc { max-width: 750px; margin: 30px auto; padding: 35px; border: 2px solid #6b3a2a; }
         .doc-header { text-align: center; border-bottom: 2px solid #c9a84c; padding-bottom: 16px; margin-bottom: 20px; }
-        .doc-header .cross { font-size: 2.5rem; color: #6b3a2a; line-height: 1; }
+        .doc-header .cross { font-size: 2.5rem; color: #6b3a2a; }
         .doc-header h2 { color: #4e2a1e; font-size: 1.3rem; margin: 4px 0 2px; }
         .doc-header p { color: #888; font-size: 0.78rem; margin: 0; }
         .doc-title { text-align: center; margin-bottom: 18px; }
@@ -34,7 +34,7 @@
         .sig hr { border-top: 1px solid #333; margin-bottom: 4px; }
         .sig small { font-size: 0.72rem; color: #666; }
         .issued { text-align: center; color: #aaa; font-size: 0.72rem; margin-top: 20px; }
-        @media print { .no-print { display: none !important; } body { margin: 0; } .doc { border: 2px solid #6b3a2a; } }
+        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body>
@@ -46,69 +46,68 @@
     </div>
     <div class="doc-title"><h3>Member Profile Record</h3></div>
 
-    <!-- Personal Info -->
     <div class="section-label">Personal Information</div>
     <div class="field-row"><div class="field-label">Full Name:</div><div class="field-value">{{ member.full_name }}</div></div>
-    <div class="field-row"><div class="field-label">Birthday:</div><div class="field-value">{{ member.birthday }}</div></div>
-    <div class="field-row"><div class="field-label">Gender:</div><div class="field-value">{{ member.get_gender_display }}</div></div>
-    <div class="field-row"><div class="field-label">Civil Status:</div><div class="field-value">{{ member.get_civil_status_display }}</div></div>
-    <div class="field-row"><div class="field-label">Address:</div><div class="field-value">{{ member.address }}</div></div>
+    <div class="field-row"><div class="field-label">Birthday:</div><div class="field-value">{{ member.birthdate|default:"—" }}</div></div>
+    <div class="field-row"><div class="field-label">Gender:</div><div class="field-value">{{ member.get_gender_display|default:"—" }}</div></div>
+    <div class="field-row"><div class="field-label">Civil Status:</div><div class="field-value">{{ member.get_civil_status_display|default:"—" }}</div></div>
+    <div class="field-row"><div class="field-label">Address:</div><div class="field-value">{{ member.address|default:"—" }}</div></div>
     <div class="field-row"><div class="field-label">Contact Number:</div><div class="field-value">{{ member.contact_number|default:"—" }}</div></div>
     <div class="field-row"><div class="field-label">Email:</div><div class="field-value">{{ member.email|default:"—" }}</div></div>
     <div class="field-row"><div class="field-label">Date Registered:</div><div class="field-value">{{ member.date_registered }}</div></div>
 
-    <!-- Sacraments -->
     <div class="section-label">Sacramental Records</div>
+    {% with sacraments=member.sacraments.all %}
     <div class="sacrament-grid">
+        {% with baptism=sacraments|dictsort:"sacrament_type" %}
         <div class="sacrament-box">
             <div class="s-title">✝ Baptism</div>
-            {% if member.baptism %}
-                <div class="s-val">{{ member.baptism.date_baptized }} — {{ member.baptism.priest }}</div>
-                {% if member.baptism.get_godfathers %}<div class="s-val">GF: {{ member.baptism.get_godfathers|join:", " }}</div>{% endif %}
-                {% if member.baptism.get_godmothers %}<div class="s-val">GM: {{ member.baptism.get_godmothers|join:", " }}</div>{% endif %}
-            {% else %}<div class="s-none">No record</div>{% endif %}
+            {% for s in sacraments %}{% if s.sacrament_type == 'baptism' %}
+                <div class="s-val">{{ s.date_received }} — {{ s.officiant_name|default:"—" }}</div>
+                {% if s.baptism_detail %}<div class="s-val">Father: {{ s.baptism_detail.father_name|default:"—" }} / Mother: {{ s.baptism_detail.mother_name|default:"—" }}</div>{% endif %}
+            {% endif %}{% endfor %}
+            {% if not sacraments|length %}<div class="s-none">No record</div>{% endif %}
         </div>
+        {% endwith %}
         <div class="sacrament-box">
             <div class="s-title">✝ Confirmation</div>
-            {% if member.confirmation %}
-                <div class="s-val">{{ member.confirmation.date_confirmed }} — {{ member.confirmation.bishop }}</div>
-                <div class="s-val">Name: {{ member.confirmation.confirmation_name }}</div>
-            {% else %}<div class="s-none">No record</div>{% endif %}
+            {% for s in sacraments %}{% if s.sacrament_type == 'confirmation' %}
+                <div class="s-val">{{ s.date_received }} — {{ s.officiant_name|default:"—" }}</div>
+                {% if s.confirmation_detail %}<div class="s-val">Name: {{ s.confirmation_detail.confirmation_name|default:"—" }}</div>{% endif %}
+            {% endif %}{% endfor %}
         </div>
         <div class="sacrament-box">
             <div class="s-title">✝ First Holy Communion</div>
-            {% if member.communion %}
-                <div class="s-val">{{ member.communion.date_received }} — {{ member.communion.priest }}</div>
-            {% else %}<div class="s-none">No record</div>{% endif %}
+            {% for s in sacraments %}{% if s.sacrament_type == 'communion' %}
+                <div class="s-val">{{ s.date_received }} — {{ s.officiant_name|default:"—" }}</div>
+            {% endif %}{% endfor %}
         </div>
         <div class="sacrament-box">
             <div class="s-title">✝ Last Rites</div>
-            {% if member.last_rites %}
-                <div class="s-val">{{ member.last_rites.date_administered }} — {{ member.last_rites.priest }}</div>
-            {% else %}<div class="s-none">No record</div>{% endif %}
+            {% for s in sacraments %}{% if s.sacrament_type == 'last_rites' %}
+                <div class="s-val">{{ s.date_received }} — {{ s.officiant_name|default:"—" }}</div>
+            {% endif %}{% endfor %}
         </div>
     </div>
-    {% if member.marriages.all %}
+    {% for s in sacraments %}{% if s.sacrament_type == 'marriage' %}
     <div class="sacrament-box" style="margin-bottom:8px;">
-        <div class="s-title">✝ Marriage(s)</div>
-        {% for m in member.marriages.all %}
-            <div class="s-val">{{ m.date_married }} — {{ m.spouse_name }} ({{ m.priest }})</div>
-        {% endfor %}
+        <div class="s-title">✝ Marriage</div>
+        <div class="s-val">{{ s.date_received }} — {% if s.marriage_detail %}{{ s.marriage_detail.spouse_name }}{% endif %} ({{ s.officiant_name|default:"—" }})</div>
     </div>
-    {% endif %}
+    {% endif %}{% endfor %}
+    {% endwith %}
 
-    <!-- Pledges -->
     {% if member.pledges.all %}
     <div class="section-label">Pledge Records</div>
     <table class="table pledge-table table-bordered mb-0">
-        <thead><tr><th>Description</th><th>Pledged</th><th>Paid</th><th>Balance</th><th>Status</th></tr></thead>
+        <thead><tr><th>Amount Promised</th><th>Paid</th><th>Balance</th><th>Due Date</th><th>Status</th></tr></thead>
         <tbody>
             {% for p in member.pledges.all %}
             <tr>
-                <td>{{ p.description }}</td>
-                <td>₱{{ p.amount_pledged }}</td>
+                <td>₱{{ p.amount_promised }}</td>
                 <td>₱{{ p.total_paid }}</td>
                 <td>₱{{ p.balance }}</td>
+                <td>{{ p.due_date|default:"—" }}</td>
                 <td>
                     {% if p.status == 'paid' %}<span class="badge-paid">Fully Paid</span>
                     {% elif p.status == 'partial' %}<span class="badge-partial">Partial</span>
@@ -126,11 +125,8 @@
     </div>
     <div class="issued">Issued on: {% now "F d, Y" %} &bull; Official Parish Record</div>
 </div>
-
 <div class="text-center mt-3 no-print">
-    <button onclick="window.print()" class="btn btn-sm" style="background:#6b3a2a;color:#fff;">
-        🖨 Print Profile
-    </button>
+    <button onclick="window.print()" class="btn btn-sm" style="background:#6b3a2a;color:#fff;">🖨 Print Profile</button>
     <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary ms-2">Back</a>
 </div>
 </body>

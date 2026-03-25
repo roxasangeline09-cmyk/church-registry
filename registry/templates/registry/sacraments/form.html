@@ -13,7 +13,7 @@
                 <hr class="mt-0">
                 <h6 class="fw-semibold mb-3" style="color:#6b3a2a;">{{ title }}</h6>
 
-                {% if form.errors %}
+                {% if sac_form.errors or det_form.errors %}
                 <div class="alert alert-danger py-2 px-3 mb-3" style="border-radius:8px;">
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
                     <strong>Please fix the errors below before saving.</strong>
@@ -23,23 +23,32 @@
                 <form method="post" novalidate>
                     {% csrf_token %}
                     <div class="row g-3">
-                        {% for field in form %}
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold small">
-                                {{ field.label }}
-                                {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
-                            </label>
-                            {{ field }}
-                            {% if field.errors %}
-                                <div class="text-danger small mt-1">
-                                    <i class="bi bi-x-circle me-1"></i>{{ field.errors.0 }}
-                                </div>
-                            {% endif %}
-                            {% if field.help_text %}
-                                <div class="text-muted small mt-1">{{ field.help_text }}</div>
-                            {% endif %}
+                            <label class="form-label fw-semibold small">Date <span class="text-danger">*</span></label>
+                            {{ sac_form.date_received }}
+                            {% if sac_form.date_received.errors %}<div class="text-danger small mt-1">{{ sac_form.date_received.errors.0 }}</div>{% endif %}
                         </div>
-                        {% endfor %}
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Officiating Priest / Bishop</label>
+                            {{ sac_form.officiant_name }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Place</label>
+                            {{ sac_form.place }}
+                        </div>
+                        {% if det_form %}
+                            {% for field in det_form %}
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors.0 }}</div>{% endif %}
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                        <div class="col-12">
+                            <label class="form-label fw-semibold small">Remarks <span class="text-muted">(optional)</span></label>
+                            {{ sac_form.remarks }}
+                        </div>
                     </div>
                     <div class="d-flex gap-2 mt-4">
                         <button type="submit" class="btn btn-primary-church px-4">
@@ -57,19 +66,8 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // All date fields in sacraments cannot be future
         const today = new Date().toISOString().split('T')[0];
-        document.querySelectorAll('input[type="date"]').forEach(function (input) {
-            input.setAttribute('max', today);
-        });
-
-        // Highlight invalid fields
-        document.querySelectorAll('.text-danger').forEach(function (el) {
-            const input = el.previousElementSibling;
-            if (input && (input.tagName === 'INPUT' || input.tagName === 'SELECT' || input.tagName === 'TEXTAREA')) {
-                input.classList.add('is-invalid');
-            }
-        });
+        document.querySelectorAll('input[type="date"]').forEach(i => i.setAttribute('max', today));
     });
 </script>
 {% endblock %}

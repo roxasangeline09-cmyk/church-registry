@@ -47,11 +47,16 @@
                             {% endif %}
                         </div>
 
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold small">Suffix <span class="text-muted">(optional)</span></label>
+                            {{ form.suffix }}
+                        </div>
+
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold small">Birthday *</label>
-                            {{ form.birthday }}
-                            {% if form.birthday.errors %}
-                                <div class="text-danger small mt-1"><i class="bi bi-x-circle me-1"></i>{{ form.birthday.errors.0 }}</div>
+                            <label class="form-label fw-semibold small">Birthday <span class="text-muted">(optional)</span></label>
+                            {{ form.birthdate }}
+                            {% if form.birthdate.errors %}
+                                <div class="text-danger small mt-1"><i class="bi bi-x-circle me-1"></i>{{ form.birthdate.errors.0 }}</div>
                             {% else %}
                                 <div class="text-muted small mt-1">Cannot be a future date.</div>
                             {% endif %}
@@ -121,7 +126,7 @@
     // Set birthday max to today
     document.addEventListener('DOMContentLoaded', function () {
         const today = new Date().toISOString().split('T')[0];
-        const birthdayInput = document.querySelector('input[name="birthday"]');
+        const birthdayInput = document.querySelector('input[name="birthdate"]');
         if (birthdayInput) birthdayInput.setAttribute('max', today);
 
         // Highlight fields with errors

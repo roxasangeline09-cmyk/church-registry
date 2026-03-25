@@ -92,9 +92,9 @@
                         {% for payment in pledge.payments.all %}
                         <tr>
                             <td class="text-muted small">{{ forloop.counter }}</td>
-                            <td>{{ payment.date_paid }}</td>
-                            <td class="fw-semibold text-success">₱{{ payment.amount }}</td>
-                            <td>{{ payment.notes|default:"—" }}</td>
+                            <td>{{ payment.payment_date }}</td>
+                            <td class="fw-semibold text-success">₱{{ payment.amount_paid }}</td>
+                            <td>{{ payment.remarks|default:"—" }}</td>
                             <td>
                                 <a href="{% url 'payment_delete' payment.pk %}" class="btn btn-sm btn-outline-danger py-0 px-2">
                                     <i class="bi bi-trash"></i>
@@ -128,15 +128,19 @@
                     {% csrf_token %}
                     <div class="mb-3">
                         <label class="form-label fw-semibold small">Amount (₱) *</label>
-                        {{ payment_form.amount }}
+                        {{ payment_form.amount_paid }}
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold small">Date Paid *</label>
-                        {{ payment_form.date_paid }}
+                        {{ payment_form.payment_date }}
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold small">Notes</label>
-                        {{ payment_form.notes }}
+                        <label class="form-label fw-semibold small">Method</label>
+                        {{ payment_form.payment_method }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Remarks</label>
+                        {{ payment_form.remarks }}
                     </div>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary-church px-4">

@@ -13,12 +13,13 @@
         .cert-header p { color: #888; font-size: 0.85rem; margin: 0; }
         .cert-title { text-align: center; margin-bottom: 30px; }
         .cert-title h3 { color: #6b3a2a; font-size: 1.3rem; letter-spacing: 3px; text-transform: uppercase; }
-        .field-row { display: flex; margin-bottom: 16px; border-bottom: 1px dotted #ccc; padding-bottom: 8px; }
-        .field-label { width: 200px; font-weight: bold; color: #555; font-size: 0.9rem; }
+        .field-row { display: flex; margin-bottom: 14px; border-bottom: 1px dotted #ccc; padding-bottom: 6px; }
+        .field-label { width: 200px; font-weight: bold; color: #555; font-size: 0.9rem; flex-shrink: 0; }
         .field-value { flex: 1; font-size: 0.95rem; color: #222; }
-        .cert-footer { margin-top: 50px; display: flex; justify-content: space-between; }
-        .signature-line { text-align: center; width: 200px; }
-        .signature-line hr { border-top: 1px solid #333; }
+        .cert-footer { margin-top: 50px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .signature-line { text-align: center; width: 220px; }
+        .signature-line .sig-name { font-size: 0.85rem; color: #222; margin: 0 0 2px 0; }
+        .signature-line hr { border-top: 1px solid #333; margin: 0 0 4px 0; }
         .signature-line small { font-size: 0.75rem; color: #666; }
         @media print { .no-print { display: none; } }
     </style>
@@ -30,41 +31,34 @@
         <h2>Parish of [Parish Name]</h2>
         <p>[Parish Address] &bull; [Contact Number]</p>
     </div>
-    <div class="cert-title">
-        <h3>Certificate of Baptism</h3>
-    </div>
+    <div class="cert-title"><h3>Certificate of Baptism</h3></div>
+
     <div class="field-row"><div class="field-label">Full Name:</div><div class="field-value">{{ baptism.member.full_name }}</div></div>
-    <div class="field-row"><div class="field-label">Date of Birth:</div><div class="field-value">{{ baptism.member.birthday }}</div></div>
-    <div class="field-row"><div class="field-label">Date Baptized:</div><div class="field-value">{{ baptism.date_baptized }}</div></div>
-    <div class="field-row"><div class="field-label">Officiating Priest:</div><div class="field-value">{{ baptism.priest }}</div></div>
-    <div class="field-row"><div class="field-label">Godfathers:</div><div class="field-value">{{ baptism.get_godfathers|join:", "|default:"—" }}</div></div>
-    <div class="field-row"><div class="field-label">Godmothers:</div><div class="field-value">{{ baptism.get_godmothers|join:", "|default:"—" }}</div></div>
-    {% if baptism.birth_certificate_no %}
-    <div class="field-row"><div class="field-label">Birth Cert. No.:</div><div class="field-value">{{ baptism.birth_certificate_no }}</div></div>
+    <div class="field-row"><div class="field-label">Date of Birth:</div><div class="field-value">{{ baptism.member.birthdate|default:"—" }}</div></div>
+    <div class="field-row"><div class="field-label">Gender:</div><div class="field-value">{{ baptism.member.get_gender_display|default:"—" }}</div></div>
+    <div class="field-row"><div class="field-label">Address:</div><div class="field-value">{{ baptism.member.address|default:"—" }}</div></div>
+    <div class="field-row"><div class="field-label">Date Baptized:</div><div class="field-value">{{ baptism.date_received }}</div></div>
+    <div class="field-row"><div class="field-label">Officiating Priest:</div><div class="field-value">{{ baptism.officiant_name|default:"—" }}</div></div>
+    <div class="field-row"><div class="field-label">Place:</div><div class="field-value">{{ baptism.place|default:"—" }}</div></div>
+    {% if baptism.baptism_detail %}
+    <div class="field-row"><div class="field-label">Father's Name:</div><div class="field-value">{{ baptism.baptism_detail.father_name|default:"—" }}</div></div>
+    <div class="field-row"><div class="field-label">Mother's Name:</div><div class="field-value">{{ baptism.baptism_detail.mother_name|default:"—" }}</div></div>
     {% endif %}
-    {% if baptism.remarks %}
-    <div class="field-row"><div class="field-label">Remarks:</div><div class="field-value">{{ baptism.remarks }}</div></div>
-    {% endif %}
+    {% with participants=baptism.participants.all %}{% if participants %}
+    <div class="field-row"><div class="field-label">Godfathers (Ninong):</div><div class="field-value">{% for p in participants %}{% if p.role == 'godfather' %}{{ p.name }}{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}</div></div>
+    <div class="field-row"><div class="field-label">Godmothers (Ninang):</div><div class="field-value">{% for p in participants %}{% if p.role == 'godmother' %}{{ p.name }}{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}</div></div>
+    {% endif %}{% endwith %}
+    {% if baptism.remarks %}<div class="field-row"><div class="field-label">Remarks:</div><div class="field-value">{{ baptism.remarks }}</div></div>{% endif %}
+
     <div class="cert-footer">
-        <div class="signature-line">
-            <hr>
-            <small>Parish Priest</small>
-        </div>
-        <div class="signature-line">
-            <hr>
-            <small>Parish Secretary</small>
-        </div>
+        <div class="signature-line"><p class="sig-name">{{ baptism.officiant_name|default:"" }}</p><hr><small>Parish Priest</small></div>
+        <div class="signature-line"><p class="sig-name">&nbsp;</p><hr><small>Parish Secretary</small></div>
     </div>
-    <p class="text-center text-muted mt-4" style="font-size:0.75rem;">
-        Issued on: {% now "F d, Y" %} &bull; This is an official church document.
-    </p>
+    <p class="text-center text-muted mt-4" style="font-size:0.75rem;">Issued on: {% now "F d, Y" %} &bull; This is an official church document.</p>
 </div>
 <div class="text-center mt-3 no-print">
-    <button onclick="window.print()" class="btn btn-sm" style="background:#6b3a2a;color:#fff;">
-        <i class="bi bi-printer me-1"></i>Print Certificate
-    </button>
+    <button onclick="window.print()" class="btn btn-sm" style="background:#6b3a2a;color:#fff;">🖨 Print Certificate</button>
     <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary ms-2">Back</a>
 </div>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 </body>
 </html>
